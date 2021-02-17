@@ -1,0 +1,4 @@
+# SSH public keys with access to user "noc"
+noc-ssh-keys:
+  - SSH-Key-1
+  - SSH-Key-2
