@@ -2,10 +2,10 @@
 # Rclone Backups to cloud
 
 # rclone backend
-BACKEND="azbackups:test/ctkbackups2"
+BACKEND="ctkbackup:ctkbackup"
 
 # Subvolumes
-VOLUMES="/dat/bck/Backups /dat/bck/Volcados"
+VOLUMES="/dat/bck/Backups"
 
 # LOG
 LOG="/var/log/rclone.log"
