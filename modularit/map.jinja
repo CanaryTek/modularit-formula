@@ -1,7 +1,37 @@
 {## Start with  defaults from defaults.yaml ##}
 {% import_yaml "modularit/defaults.yaml" as default_settings %}
 
-{## 
+{## ModularIT generic config
+Setup variable using grains['os_family'] based logic, only add key:values here
+that differ from whats in defaults.yaml
+##}
+{% set os_family_map = salt['grains.filter_by']({
+    'Debian': {
+      'var1': 'value1',
+    },
+    'RedHat': {
+      'var1': 'value1',
+    },
+    'Suse': {
+      'var1': 'value1',
+    },
+  }
+  , grain="os_family"
+  , merge=salt['pillar.get']('modularit:lookup'))
+%}
+
+{## Merge the flavor_map to the default settings ##}
+{% do default_settings.modularit.update(os_family_map) %}
+
+{## Merge in modularit:lookup pillar ##}
+{% set modularit = salt['pillar.get'](
+    'modularit',
+    default=default_settings.modularit,
+    merge=True
+  )
+%}
+
+{## CTKBackup config
 Setup variable using grains['os_family'] based logic, only add key:values here
 that differ from whats in defaults.yaml
 ##}

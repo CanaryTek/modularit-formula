@@ -1,6 +1,7 @@
 ##
 ## CTKBackups
 ##
+{% from "modularit/map.jinja" import modularit with context %}
 {% from "modularit/map.jinja" import ctkbackup with context %}
 
 # TODO:
@@ -163,7 +164,7 @@ duply-exclude-Safekeep:
     - group: root
     - mode: 600
     - dir_mode: 700
-    - content:
+    - contents:
         - "# Files to exclude"
         - "- **/rdiff-backup-data"
 
@@ -188,7 +189,7 @@ duply-exclude-Volcados:
     - group: root
     - mode: 600
     - dir_mode: 700
-    - content:
+    - contents:
         - "# Files to exclude"
 
 duply-incremental-cron:
@@ -208,4 +209,55 @@ duply-full-cron:
     - dayweek: "7"
 
 # Safekeep config
-#Safrkrrp cron
+safekeep-backup-template:
+  file.managed:
+    - name: /etc/safekeep/backup.d/cliente.nodo1.backup.template
+    - source: salt://modularit/files/ctkbackup/safekeep.backup.template
+    - makedirs: true
+    - user: root
+    - group: root
+    - mode: 600
+    - dir_mode: 700
+
+# Postfix - send email through sendgrid
+postfix-pkg:
+  pkg.installed:
+    - name: postfix
+
+postfix-service:
+  service.running:
+    - name: postfix
+    - enable: True
+    - watch:
+      - file: /etc/postfix/main.cf
+      - file: /etc/postfix/sasl_passwd
+
+postfix-main-cf:
+  file.append:
+    - name: /etc/postfix/main.cf
+    - text:
+      - ""
+      - "# Use sendgrid as relayhost"
+      - smtp_sasl_auth_enable = yes
+      - smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+      - smtp_sasl_security_options = noanonymous
+      - smtp_sasl_tls_security_options = noanonymous
+      - smtp_tls_security_level = encrypt
+      - header_size_limit = 4096000
+      - relayhost = [smtp.sendgrid.net]:587
+
+postfix-sasl-cf:
+  file.managed:
+    - name: /etc/postfix/sasl_passwd
+    - user: root
+    - group: root
+    - mode: 600
+    - contents:
+        - "[smtp.sendgrid.net]:587 apikey:{{ modularit.sendgrid_api_key }}"
+
+postmap:
+  cmd.run:
+    - name: "postmap /etc/postfix/sasl_passwd; postfix reload"
+    - onchanges:
+      - file: /etc/postfix/sasl_passwd
+
