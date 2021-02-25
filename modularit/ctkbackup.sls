@@ -1,6 +1,7 @@
 ##
 ## CTKBackups
 ##
+{% from "modularit/map.jinja" import ctkbackup with context %}
 
 # TODO:
 
@@ -15,23 +16,22 @@ backup-pkgs:
 safekeep-pkgs:
   pkg.installed:
     - sources:
-      - safekeep-common: http://prdownloads.sourceforge.net/safekeep/safekeep-common_1.5.1_all.deb
-      - safekeep-server: http://prdownloads.sourceforge.net/safekeep/safekeep-server_1.5.1_all.deb
+      - safekeep-common: {{ ctkbackup.safekeep_common_url }}
+      - safekeep-server: {{ ctkbackup.safekeep_server_url }}
 
 # BTRFS subvolumes
 subvol-Backups:
   cmd.run:
-    - name: "btrfs subvol create /dat/bck/Backups"
+    - name: "btrfs subvol create /dat/bck/Backups && chmod 777 /dat/bck/Backups"
     - unless: "btrfs subvol list /dat/bck  | grep 'path Backups'"
 subvol-Volcados:
   cmd.run:
-    - name: "btrfs subvol create /dat/bck/Volcados"
+    - name: "btrfs subvol create /dat/bck/Volcados && chmod 777 /dat/bck/Volcados"
     - unless: "btrfs subvol list /dat/bck  | grep 'path Volcados'"
 subvol-Safekeep:
   cmd.run:
     - name: "btrfs subvol create /dat/bck/Safekeep"
     - unless: "btrfs subvol list /dat/bck  | grep 'path Safekeep'"
-# FIXME: TODO: Propietario de Volcados y Backups: writer
  
 # Samba
 samba-pks:
@@ -66,15 +66,16 @@ samba-shares-include:
 # Backup users
 writer-user:
   cmd.run:
-    - name: "useradd writer && (echo writer_passwd; echo writer_passwd) | smbpasswd -as writer"
+    - name: "useradd writer && (echo {{ ctkbackup.writer_password }} ; echo {{ ctkbackup.writer_password }}) | smbpasswd -as writer"
     - unless: "pdbedit -L | grep writer"
     
 reader-user:
   cmd.run:
-    - name: "useradd reader && (echo reader_passwd; echo reader_passwd) | smbpasswd -as reader"
+    - name: "useradd reader && (echo {{ ctkbackup.reader_password }} ; echo {{ ctkbackup.reader_password }}) | smbpasswd -as reader"
     - unless: "pdbedit -L | grep reader"
 
 ## Snapshots management
+# TODO: usar snapper, nos permite definir retencion por tiempo (conservar snapshot horarios, 1 diario, 1 semanal, etc)
 snapshots-script:
   file.managed:
     - name: /root/bin/manage_snapshots.sh
@@ -93,16 +94,19 @@ snapshots-cron:
     - minute: "01"
 
 ## rclone
-rcolne-config:
+rclone-config:
   file.managed:
     - name: /root/.config/rclone/rclone.conf
     - source: salt://modularit/files/ctkbackup/rclone.conf.jinja
     - replace: false
+    - template: jinja
     - makedirs: true
     - user: root
     - group: root
     - mode: 600
-    - dir_mode: 600
+    - dir_mode: 700
+    - context:
+        ctkbackup: {{ ctkbackup }}
 
 rclone-script:
   file.managed:
@@ -121,10 +125,87 @@ rclone-cron:
     - hour: "02"
     - minute: "01"
 
-# Crontab ejecucion duply
-# config duply (gpg etc)
-# gpg-master-key
+## Duply
 
-# Crontab snapshots btrfs
-# TODO: usar snapper, nos permite definir retencion por tiempo (conservar snapshot horarios, 1 diario, 1 semanal, etc)
+# Import GPG KEYS
+# TODO: Make source configurable
+cktbackup-gpg-master-key:
+  file.managed:
+    - name: /root/ctkbackup-master_pub.asc
+    - source: salt://modularit/files/ctkbackup/ctkbackup-master_pub.asc
+    - user: root
+    - group: root
+    - mode: 600
+cktbackup-gpg-master-key-import:
+  cmd.run:
+    - name: "gpg --import /root/ctkbackup-master_pub.asc && echo '{{ ctkbackup.gpg_master_key_id }}:6:' | gpg --import-ownertrust"
+    - unless: "gpg --list-keys | grep {{ ctkbackup.gpg_master_key_id }}"
 
+# Configs
+duply-conf-Safekeep:
+  file.managed:
+    - name: /root/.duply/Safekeep/conf
+    - source: salt://modularit/files/ctkbackup/duply.conf.jinja
+    - template: jinja
+    - makedirs: true
+    - user: root
+    - group: root
+    - mode: 600
+    - dir_mode: 700
+    - context:
+        volume: "Safekeep"
+        ctkbackup: {{ ctkbackup }}
+duply-exclude-Safekeep:
+  file.managed:
+    - name: /root/.duply/Safekeep/exclude
+    - makedirs: true
+    - user: root
+    - group: root
+    - mode: 600
+    - dir_mode: 700
+    - content:
+        - "# Files to exclude"
+        - "- **/rdiff-backup-data"
+
+duply-conf-Volcados:
+  file.managed:
+    - name: /root/.duply/Volcados/conf
+    - source: salt://modularit/files/ctkbackup/duply.conf.jinja
+    - template: jinja
+    - makedirs: true
+    - user: root
+    - group: root
+    - mode: 600
+    - dir_mode: 700
+    - context:
+        volume: "Volcados"
+        ctkbackup: {{ ctkbackup }}
+duply-exclude-Volcados:
+  file.managed:
+    - name: /root/.duply/Volcados/exclude
+    - makedirs: true
+    - user: root
+    - group: root
+    - mode: 600
+    - dir_mode: 700
+    - content:
+        - "# Files to exclude"
+
+duply-incremental-cron:
+  cron.present:
+    - name: /usr/bin/duply Safekeep incr ; /usr/bin/duply Volcados incr
+    - user: root
+    - hour: "01"
+    - minute: "30"
+    - dayweek: "1-6"
+
+duply-full-cron:
+  cron.present:
+    - name: /usr/bin/duply Safekeep full ; /usr/bin/duply Volcados full
+    - user: root
+    - hour: "01"
+    - minute: "30"
+    - dayweek: "7"
+
+# Safekeep config
+#Safrkrrp cron

@@ -1,0 +1,7 @@
+modularit: {}
+
+ctkbackup:
+  writer_password: writer_password
+  reader_password: reader_password
+  sas_url: SAS_URL
+  gpg_master_key_id: "62A69AD93EB02597D5237FEDEEEA5910CBBEF176"

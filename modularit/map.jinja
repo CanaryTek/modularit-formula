@@ -1,0 +1,35 @@
+{## Start with  defaults from defaults.yaml ##}
+{% import_yaml "modularit/defaults.yaml" as default_settings %}
+
+{## 
+Setup variable using grains['os_family'] based logic, only add key:values here
+that differ from whats in defaults.yaml
+##}
+{% set os_family_map = salt['grains.filter_by']({
+    'Debian': {
+      'safekeep_common_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-common_1.5.1_all.deb',
+      'safekeep_server_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-server_1.5.1_all.deb',
+    },
+    'RedHat': {
+      'safekeep_common_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-common-1.5.1-1.noarch.rpm',
+      'safekeep_server_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-server-1.5.1-1.noarch.rpm',
+    },
+    'Suse': {
+      'safekeep_common_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-common-1.5.1-1.noarch.rpm',
+      'safekeep_server_url': 'http://prdownloads.sourceforge.net/safekeep/safekeep-server-1.5.1-1.noarch.rpm',
+    },
+  }
+  , grain="os_family"
+  , merge=salt['pillar.get']('ctkbackup:lookup'))
+%}
+
+{## Merge the flavor_map to the default settings ##}
+{% do default_settings.ctkbackup.update(os_family_map) %}
+
+{## Merge in ctkbackup:lookup pillar ##}
+{% set ctkbackup = salt['pillar.get'](
+    'ctkbackup',
+    default=default_settings.ctkbackup,
+    merge=True
+  )
+%}

@@ -1,0 +1,10 @@
+GPG_KEY='{{ ctkbackup.gpg_key_id }}'
+GPG_PW='backups'
+GPG_KEY_SIGN='{{ ctkbackup.gpg_key_id }}'
+GPG_PW_SIGN='backups'
+GPG_KEYS_ENC='{{ ctkbackup.gpg_key_id }},{{ ctkbackup.gpg_master_key_id }}'
+GPG=/bin/gpg
+TARGET='rclone://ctkbackup:ctkbackup/{{ volume }}'
+SOURCE='/dat/bck/{{ volume }}'
+TEMP_DIR=/var/tmp
+ARCH_DIR=/var/cache
